@@ -5,5 +5,3 @@ yfinance
 matplotlib
 requests
 beautifulsoup4
-time
-json
