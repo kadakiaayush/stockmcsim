@@ -22,20 +22,20 @@ def fetch_stock_data(tickers, period="10y", batch_size=20):
     all_data = pd.DataFrame()
     for i in range(0, len(tickers), batch_size):
         batch_tickers = tickers[i:i + batch_size]
-        batch_data = yf.download(batch_tickers, period=period)
+        try:
+            batch_data = yf.download(batch_tickers, period=period, group_by='ticker', auto_adjust=True)
+        except Exception as e:
+            st.error(f"Error fetching data for {batch_tickers}: {e}")
+            continue
 
-        # Check for 'Adj Close', fallback to 'Close' if not available
-        if 'Adj Close' not in batch_data.columns:
-            if 'Close' in batch_data.columns:
-                batch_data['Adj Close'] = batch_data['Close']
+        for ticker in batch_tickers:
+            if ticker in batch_data:
+                adj_close = batch_data[ticker]['Adj Close']
+                all_data[ticker] = adj_close
             else:
-                st.warning(f"Data for {batch_tickers} is missing both 'Adj Close' and 'Close'. Skipping.")
-                continue  # Skip this batch if no usable data
-
-        all_data = pd.concat([all_data, batch_data['Adj Close']], axis=1)
+                st.warning(f"Data for {ticker} is missing. Skipping.")
         time.sleep(1)  # To avoid rate limiting
-    
-    return all_data.dropna(how='all')  # Drop rows with all NaNs
+    return all_data.dropna(how='all')
 
 # Calculate logarithmic returns
 def calculate_log_returns(historical_prices):
@@ -79,9 +79,8 @@ def simulate_stock_prices(historical_prices, num_simulations, num_days, macro_da
     cov_log_returns = calculate_covariance_matrix(log_returns)
     mean_log_returns = adjust_returns_based_on_macro(mean_log_returns, macro_data)
 
-    # Ensure covariance matrix is positive semi-definite
     eigenvalues, eigenvectors = np.linalg.eigh(cov_log_returns)
-    eigenvalues = np.clip(eigenvalues, a_min=0, a_max=None)  # Set negative eigenvalues to 0
+    eigenvalues = np.clip(eigenvalues, a_min=0, a_max=None)
     cov_log_returns = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
 
     simulated_prices = {stock: np.zeros((num_days, num_simulations)) for stock in historical_prices.columns}
@@ -120,19 +119,17 @@ def plot_histograms(simulated_prices):
         plt.legend()
         st.pyplot(plt)
 
-# Main function to define the Streamlit app and call other functions to cohesively run simulation & analysis
+# Main function
 def main():
     st.title('Stock Price Simulation and Analysis')
     sp500_tickers = fetch_sp500_tickers()
-    # UI & User inputs
     st.sidebar.header('Simulation Parameters')
     selected_tickers = st.sidebar.multiselect('Select Stock Tickers', sp500_tickers, default=['AAPL', 'MSFT'])
-    num_simulations = st.sidebar.slider('Number of Simulations', min_value=1000, max_value=10000, value=10000, step=1000)
+    num_simulations = st.sidebar.slider('Number of Simulations', min_value=1000, max_value=10000, value=1000, step=1000)
     num_days = st.sidebar.slider('Number of Days', min_value=10, max_value=50, value=30, step=5)
     increase_percentage = st.sidebar.slider('Boom Return Threshold', min_value=0.0, max_value=0.5, value=0.2, step=0.05)
     decrease_percentage = st.sidebar.slider('Bust Return Threshold', min_value=0.0, max_value=0.5, value=0.2, step=0.05)
 
-    # Fetch stock data
     historical_prices = fetch_stock_data(selected_tickers)
     if historical_prices.empty:
         st.error("No valid stock data found. Please select different tickers or try again.")
@@ -141,19 +138,15 @@ def main():
     st.subheader('Historical Stock Prices')
     st.write(historical_prices.tail())
 
-    # Get real-time macroeconomic data
-    st.subheader('Macroeconomic Data')
-    api_key = "08828fc4fc9dbcfbea6f77718987ade3"  # Replace with your FRED API key
+    api_key = "08828fc4fc9dbcfbea6f77718987ade3"
     series_id = "CPIAUCSL"
     macro_data = fetch_macro_data_from_fred(api_key, series_id)
     if macro_data.empty:
         st.stop()
     st.write(macro_data.tail())
 
-    # Run simulations
     simulated_prices = simulate_stock_prices(historical_prices, num_simulations, num_days, macro_data)
 
-    # Plot simulated price paths
     st.subheader('Simulated Price Paths')
     for stock in selected_tickers:
         plt.figure(figsize=(10, 6))
@@ -163,20 +156,16 @@ def main():
         plt.ylabel('Price')
         st.pyplot(plt)
 
-    # Plot histograms
     st.subheader('Histograms of Final Simulated Prices')
     plot_histograms(simulated_prices)
 
-    # Analyze boom and bust probabilities
     current_prices = historical_prices.iloc[-1]
     boom_probabilities, bust_probabilities = analyze_simulations(simulated_prices, current_prices, increase_percentage, decrease_percentage)
 
-    # Display boom probabilities
     st.subheader('Boom Probabilities')
     for stock, prob in boom_probabilities.items():
         st.write(f"{stock}: {prob:.2%}")
 
-    # Display bust probabilities
     st.subheader('Bust Probabilities')
     for stock, prob in bust_probabilities.items():
         st.write(f"{stock}: {prob:.2%}")
