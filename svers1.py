@@ -17,15 +17,21 @@ def fetch_sp500_tickers():
     tickers = [row.findAll('td')[0].text.strip() for row in table.findAll('tr')[1:]]
     return tickers
 
-# Get historical stock data for tickers
 def fetch_stock_data(tickers, period="10y", batch_size=20):
     all_data = pd.DataFrame()
     for i in range(0, len(tickers), batch_size):
-        batch_tickers = tickers[i:i+batch_size]
-        batch_data = yf.download(batch_tickers, period=period)['Adj Close']
-        all_data = pd.concat([all_data, batch_data], axis=1)
-        time.sleep(1) 
+        batch_tickers = tickers[i:i + batch_size]
+        batch_data = yf.download(batch_tickers, period=period)
+        
+        # Check for 'Adj Close', fallback to 'Close' if not available
+        if 'Adj Close' not in batch_data.columns:
+            batch_data['Adj Close'] = batch_data.get('Close', pd.Series())
+        
+        all_data = pd.concat([all_data, batch_data['Adj Close']], axis=1)
+        time.sleep(1)  # To avoid rate limiting
+    
     return all_data
+
 
 # Calculate logarithmic returns
 def calculate_log_returns(historical_prices):
