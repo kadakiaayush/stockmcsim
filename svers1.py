@@ -28,13 +28,17 @@ def fetch_stock_data(tickers, period="10y", batch_size=20):
             st.error(f"Error fetching data for {batch_tickers}: {e}")
             continue
 
-        for ticker in batch_tickers:
-            if ticker in batch_data:
-                adj_close = batch_data[ticker]['Adj Close']
-                all_data[ticker] = adj_close
-            else:
-                st.warning(f"Data for {ticker} is missing. Skipping.")
+        if isinstance(batch_data, pd.DataFrame):
+            for ticker in batch_tickers:
+                if ticker in batch_data.columns.get_level_values(0):
+                    adj_close = batch_data[(ticker, 'Adj Close')]
+                    all_data[ticker] = adj_close
+                else:
+                    st.warning(f"Data for {ticker} is missing 'Adj Close'. Skipping.")
+        else:
+            st.warning(f"Batch data for {batch_tickers} returned unexpected format. Skipping.")
         time.sleep(1)  # To avoid rate limiting
+
     return all_data.dropna(how='all')
 
 # Calculate logarithmic returns
