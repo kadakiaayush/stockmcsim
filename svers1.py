@@ -15,14 +15,9 @@ def fetch_stock_data(tickers, period="10y"):
         if data.empty:
             st.error("No data fetched for the given tickers. Please check the tickers or try again later.")
             st.stop()
-        # Use the 'Close' column as a fallback if 'Adj Close' is missing
-        if 'Adj Close' not in data:
-            st.warning("'Adj Close' column is missing. Using 'Close' column as a fallback.")
-            if 'Close' not in data:
-                st.error("Neither 'Adj Close' nor 'Close' columns are available in the data.")
-                st.stop()
-            return data['Close']
-        return data['Adj Close']
+        # Default to the 'Close' column and only use 'Adj Close' if explicitly available
+        price_column = 'Adj Close' if 'Adj Close' in data else 'Close'
+        return data[price_column]
     except Exception as e:
         st.error(f"An error occurred while fetching stock data: {e}")
         st.stop()
