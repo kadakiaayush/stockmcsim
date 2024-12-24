@@ -8,15 +8,20 @@ import requests
 # Function to fetch historical stock data from Yahoo Finance
 def fetch_stock_data(tickers, period="10y"):
     try:
+        st.write("Fetching stock data...")
         data = yf.download(tickers, period=period)
+        st.write("Downloaded data preview:")
+        st.write(data.head())  # Display a preview for debugging
         if data.empty:
-            st.error("No data was fetched for the given tickers. Please try again.")
+            st.error("No data fetched for the given tickers. Please check the tickers or try again later.")
             st.stop()
-        if 'Adj Close' not in data.columns:
-            st.error("'Adj Close' column is missing in the fetched data.")
-            st.write("Downloaded data structure:")
-            st.write(data)
-            st.stop()
+        # Use the 'Close' column as a fallback if 'Adj Close' is missing
+        if 'Adj Close' not in data:
+            st.warning("'Adj Close' column is missing. Using 'Close' column as a fallback.")
+            if 'Close' not in data:
+                st.error("Neither 'Adj Close' nor 'Close' columns are available in the data.")
+                st.stop()
+            return data['Close']
         return data['Adj Close']
     except Exception as e:
         st.error(f"An error occurred while fetching stock data: {e}")
@@ -38,7 +43,7 @@ def fetch_macro_data_from_fred(api_key, series_id):
         response = requests.get(url)
         data = response.json()
         if 'observations' not in data:
-            st.error("No macroeconomic data was fetched. Please check the API key and series ID.")
+            st.error("No macroeconomic data fetched. Please check the API key and series ID.")
             st.stop()
         observations = data['observations']
         dates = [obs['date'] for obs in observations]
