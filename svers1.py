@@ -25,7 +25,7 @@ def fetch_stock_data(tickers, period="10y"):
         st.write("Fetching stock data...")
         data = yf.download(tickers, period=period)
         if data.empty:
-            st.error("Undergoing construction to become bigger, better, & smarter! Last updated 18:21 EST 05/01/25. Anticipated fix date within 48hrs")
+            st.error("Undergoing construction to become bigger, better, & smarter! Last updated 18:21 EST 05/01/25. Anticipated fully functiomal with improvements within 48hrs")
             st.stop()
         return data['Adj Close'] if 'Adj Close' in data else data['Close']
     except Exception as e:
