@@ -5,12 +5,8 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import requests
 from bs4 import BeautifulSoup
-import time
-from datetime import datetime
-from functools import lru_cache
 
 # Function to get the full list of S&P 500 tickers
-@st.cache_data(ttl=86400)  # Cache for 1 day
 def get_sp500_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     response = requests.get(url)
@@ -22,42 +18,15 @@ def get_sp500_tickers():
         tickers.append(cols[0].text.strip())
     return tickers
 
-# Function to fetch historical stock data from Yahoo Finance with rate limiting
-@st.cache_data(ttl=3600)  # Cache for 1 hour
+# Function to fetch historical stock data from Yahoo Finance
 def fetch_stock_data(tickers, period="10y"):
     try:
-        st.write(f"Fetching stock data at {datetime.now().strftime('%H:%M:%S')}...")
-        
-        if isinstance(tickers, str):
-            tickers = [tickers]
-            
-        data = pd.DataFrame()
-        for i, ticker in enumerate(tickers):
-            # Add delay between requests to avoid rate limiting
-            if i > 0:
-                time.sleep(2)  # 2 second delay between tickers
-            
-            try:
-                ticker_obj = yf.Ticker(ticker)
-                hist = ticker_obj.history(period=period)
-                if not hist.empty:
-                    data[ticker] = hist['Close']
-            except Exception as e:
-                st.warning(f"Failed to fetch {ticker}, retrying... Error: {str(e)}")
-                time.sleep(5)  # Longer delay if failure occurs
-                try:
-                    ticker_obj = yf.Ticker(ticker)
-                    hist = ticker_obj.history(period=period)
-                    if not hist.empty:
-                        data[ticker] = hist['Close']
-                except Exception as e:
-                    st.error(f"Permanent failure fetching {ticker}: {str(e)}")
-                    continue
-        
+        st.write("Fetching stock data...")
+        data = yf.download(tickers, period=period)
         if data.empty:
             st.error("No data fetched for the given tickers. Please check the tickers or try again later.")
             st.stop()
-        return data
+        return data['Adj Close'] if 'Adj Close' in data else data['Close']
     except Exception as e:
         st.error(f"An error occurred while fetching stock data: {e}")
         st.stop()
@@ -71,7 +40,6 @@ def calculate_covariance_matrix(log_returns):
     return log_returns.cov()
 
 # Function to fetch macroeconomic data from FRED
-@st.cache_data(ttl=86400)  # Cache for 1 day
 def fetch_macro_data_from_fred(api_key, series_id):
     try:
         url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}&api_key={api_key}&file_type=json"
@@ -141,10 +109,6 @@ def plot_histograms(simulated_prices):
 def main():
     st.title('Stock Price Simulation and Analysis')
     
-    # Initialize session state for persistent data
-    if 'stock_data' not in st.session_state:
-        st.session_state.stock_data = None
-    
     sp500_tickers = get_sp500_tickers()
     st.sidebar.header('Simulation Parameters')
     selected_tickers = st.sidebar.multiselect('Select Stock Tickers', sp500_tickers, default=['AAPL', 'MSFT'])
@@ -153,18 +117,7 @@ def main():
     increase_percentage = st.sidebar.slider('Boom Return Threshold', 0.0, 0.5, 0.2, 0.05)
     decrease_percentage = st.sidebar.slider('Bust Return Threshold', 0.0, 0.5, 0.2, 0.05)
 
-    # Add a refresh button
-    if st.sidebar.button('Refresh Data'):
-        st.session_state.stock_data = None
-        st.rerun()
-
-    # Fetch data only if we don't have it or if tickers changed
-    if st.session_state.stock_data is None or not all(ticker in st.session_state.stock_data.columns for ticker in selected_tickers):
-        with st.spinner('Downloading stock data...'):
-            st.session_state.stock_data = fetch_stock_data(selected_tickers)
-    
-    historical_prices = st.session_state.stock_data[selected_tickers] if len(selected_tickers) > 1 else st.session_state.stock_data
-    
+    historical_prices = fetch_stock_data(selected_tickers)
     st.subheader('Historical Stock Prices')
     st.write(historical_prices.tail())
 
