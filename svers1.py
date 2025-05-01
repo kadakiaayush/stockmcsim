@@ -19,7 +19,6 @@ def get_sp500_tickers():
     return tickers
 
 # Function to fetch historical stock data from Yahoo Finance
-@st.cache_data
 def fetch_stock_data(tickers, period="10y"):
     try:
         st.write("Fetching stock data...")
