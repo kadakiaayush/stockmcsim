@@ -5,6 +5,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import requests
 from bs4 import BeautifulSoup
+import time
 
 # Function to get the full list of S&P 500 tickers
 def get_sp500_tickers():
@@ -18,12 +19,12 @@ def get_sp500_tickers():
         tickers.append(cols[0].text.strip())
     return tickers
 
-# Function to fetch historical stock data from Yahoo Finance
-@st.cache_data
+# Function to fetch historical stock data from Yahoo Finance with delay
 def fetch_stock_data(tickers, period="10y"):
     try:
         st.write("Fetching stock data...")
         data = yf.download(tickers, period=period)
+        time.sleep(1)  # Delay to prevent hitting rate limits
         if data.empty:
             st.error("No data fetched for the given tickers. Please check the tickers or try again later.")
             st.stop()
