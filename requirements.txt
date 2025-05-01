@@ -1,7 +1,7 @@
 streamlit
 numpy
 pandas
-yfinance
+yfinance>=0.2.57
 matplotlib
 requests
 beautifulsoup4
