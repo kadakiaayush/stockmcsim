@@ -18,17 +18,21 @@ def get_sp500_tickers():
         tickers.append(cols[0].text.strip())
     return tickers
 
-# Function to fetch historical stock data from Yahoo Finance
+# Cached function to fetch historical stock data from Yahoo Finance
+@st.cache_data(ttl=3600)
 def fetch_stock_data(tickers, period="10y"):
     try:
         st.write("Fetching stock data...")
-        data = yf.download(tickers, period=period)
+        data = yf.download(tickers, period=period, threads=False)
         if data.empty:
             st.error("No data fetched for the given tickers. Please check the tickers or try again later.")
             st.stop()
         return data['Adj Close'] if 'Adj Close' in data else data['Close']
     except Exception as e:
-        st.error(f"An error occurred while fetching stock data: {e}")
+        if "rate limit" in str(e).lower():
+            st.error("Yahoo Finance rate limit reached. Please try again later.")
+        else:
+            st.error(f"An error occurred while fetching stock data: {e}")
         st.stop()
 
 # Function to calculate log returns
@@ -108,7 +112,7 @@ def plot_histograms(simulated_prices):
 # Define the Streamlit app
 def main():
     st.title('Stock Price Simulation and Analysis')
-    
+
     sp500_tickers = get_sp500_tickers()
     st.sidebar.header('Simulation Parameters')
     selected_tickers = st.sidebar.multiselect('Select Stock Tickers', sp500_tickers, default=['AAPL', 'MSFT'])
