@@ -5,6 +5,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import requests
 from bs4 import BeautifulSoup
+from curl_cffi import requests as curl_requests  # NEW: Use curl_cffi for bypassing YF rate limits
 
 # Function to get the full list of S&P 500 tickers
 def get_sp500_tickers():
@@ -22,9 +23,10 @@ def get_sp500_tickers():
 def fetch_stock_data(tickers, period="10y"):
     try:
         st.write("Fetching stock data...")
-        data = yf.download(tickers, period=period)
+        session = curl_requests.Session(impersonate="chrome")  # NEW: Bypass rate limit
+        data = yf.download(tickers, period=period, session=session)
         if data.empty:
-            st.error("Undergoing construction to become bigger, better, & smarter! Last updated 18:21 EST 05/01/25. Anticipated fully functional with improvements within 48hrs")
+            st.error("No data fetched for the given tickers. Please check the tickers or try again later.")
             st.stop()
         return data['Adj Close'] if 'Adj Close' in data else data['Close']
     except Exception as e:
@@ -122,7 +124,7 @@ def main():
     st.write(historical_prices.tail())
 
     st.subheader('Macroeconomic Data')
-    api_key = "08828fc4fc9dbcfbea6f77718987ade3"
+    api_key = "08828fc4fc9dbcfbea6f77718987ade3"  # Replace with env var if deploying securely
     series_id = "CPIAUCSL"
     macro_data = fetch_macro_data_from_fred(api_key, series_id)
     st.write(macro_data.tail())
