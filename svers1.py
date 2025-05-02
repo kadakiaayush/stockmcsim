@@ -1,43 +1,47 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import yfinance as yf
 import matplotlib.pyplot as plt
-import requests
+from curl_cffi import requests as curl_requests
 from bs4 import BeautifulSoup
-from curl_cffi import requests as curl_requests  # NEW: Use curl_cffi for bypassing YF rate limits
+import yfinance as yf
 
 # Function to get the full list of S&P 500 tickers
 def get_sp500_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    response = requests.get(url)
+    response = curl_requests.get(url, impersonate="chrome")
     soup = BeautifulSoup(response.text, 'html.parser')
     table = soup.find('table', {'id': 'constituents'})
-    tickers = []
-    for row in table.find_all('tr')[1:]:
-        cols = row.find_all('td')
-        tickers.append(cols[0].text.strip())
+    tickers = [row.find_all('td')[0].text.strip() for row in table.find_all('tr')[1:]]
     return tickers
 
-# Function to fetch historical stock data from Yahoo Finance
+# Function to fetch historical stock data with curl_cffi session
 def fetch_stock_data(tickers, period="10y"):
-    try:
-        st.write("Fetching stock data...")
-        session = curl_requests.Session(impersonate="chrome")  # NEW: Bypass rate limit
-        data = yf.download(tickers, period=period, session=session)
-        if data.empty:
-            st.error("No data fetched for the given tickers. Please check the tickers or try again later.")
-            st.stop()
-        return data['Adj Close'] if 'Adj Close' in data else data['Close']
-    except Exception as e:
-        st.error(f"An error occurred while fetching stock data: {e}")
+    st.write("Fetching stock data...")
+    session = curl_requests.Session(impersonate="chrome")
+    data_dict = {}
+
+    for ticker in tickers:
+        try:
+            stock = yf.Ticker(ticker, session=session)
+            hist = stock.history(period=period, raise_errors=True)
+            if hist.empty:
+                st.warning(f"No data returned for {ticker}.")
+                continue
+            data_dict[ticker] = hist['Adj Close'] if 'Adj Close' in hist else hist['Close']
+        except Exception as e:
+            st.warning(f"Failed to get ticker '{ticker}' reason: {e}")
+
+    if not data_dict:
+        st.error("No data fetched for the selected tickers.")
         st.stop()
 
-# Function to calculate log returns
+    df = pd.DataFrame(data_dict)
+    return df
+
 def calculate_log_returns(historical_prices):
     return np.log(historical_prices / historical_prices.shift(1)).dropna()
 
-# Function to calculate covariance matrix
 def calculate_covariance_matrix(log_returns):
     return log_returns.cov()
 
@@ -45,15 +49,15 @@ def calculate_covariance_matrix(log_returns):
 def fetch_macro_data_from_fred(api_key, series_id):
     try:
         url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}&api_key={api_key}&file_type=json"
-        response = requests.get(url)
+        response = curl_requests.get(url, impersonate="chrome")
         data = response.json()
         if 'observations' not in data:
             st.error("No macroeconomic data fetched. Please check the API key and series ID.")
             st.stop()
         observations = data['observations']
         dates = [obs['date'] for obs in observations]
-        values = [float(obs['value']) for obs in observations]
-        macro_data = pd.DataFrame({'date': dates, 'value': values})
+        values = [float(obs['value']) for obs in observations if obs['value'] != "."]
+        macro_data = pd.DataFrame({'date': dates[:len(values)], 'value': values})
         macro_data['date'] = pd.to_datetime(macro_data['date'])
         macro_data.set_index('date', inplace=True)
         return macro_data
@@ -61,13 +65,11 @@ def fetch_macro_data_from_fred(api_key, series_id):
         st.error(f"An error occurred while fetching macroeconomic data: {e}")
         st.stop()
 
-# Function to adjust returns based on macro data
 def adjust_returns_based_on_macro(mean_log_returns, macro_data):
     normalized_macro = (macro_data - macro_data.mean()) / macro_data.std()
     latest_macro_value = normalized_macro.iloc[-1].values[0]
     return mean_log_returns * (1 + latest_macro_value)
 
-# Function to simulate stock prices
 def simulate_stock_prices(historical_prices, num_simulations, num_days, macro_data):
     log_returns = calculate_log_returns(historical_prices)
     mean_log_returns = log_returns.mean()
@@ -82,7 +84,6 @@ def simulate_stock_prices(historical_prices, num_simulations, num_days, macro_da
             simulated_prices[stock][t] = simulated_prices[stock][t-1] * np.exp(random_shocks[:, i])
     return simulated_prices
 
-# Analyze simulation results
 def analyze_simulations(simulated_prices, current_prices, increase_percentage, decrease_percentage):
     boom_probabilities, bust_probabilities = {}, {}
     for stock, simulations in simulated_prices.items():
@@ -93,7 +94,6 @@ def analyze_simulations(simulated_prices, current_prices, increase_percentage, d
         bust_probabilities[stock] = np.mean(final_prices < bust_threshold)
     return boom_probabilities, bust_probabilities
 
-# Plot histograms
 def plot_histograms(simulated_prices):
     for stock, simulations in simulated_prices.items():
         final_prices = simulations[-1]
@@ -107,10 +107,9 @@ def plot_histograms(simulated_prices):
         plt.legend()
         st.pyplot(plt)
 
-# Define the Streamlit app
 def main():
     st.title('Stock Price Simulation and Analysis')
-    
+
     sp500_tickers = get_sp500_tickers()
     st.sidebar.header('Simulation Parameters')
     selected_tickers = st.sidebar.multiselect('Select Stock Tickers', sp500_tickers, default=['AAPL', 'MSFT'])
@@ -124,7 +123,7 @@ def main():
     st.write(historical_prices.tail())
 
     st.subheader('Macroeconomic Data')
-    api_key = "08828fc4fc9dbcfbea6f77718987ade3"  # Replace with env var if deploying securely
+    api_key = "08828fc4fc9dbcfbea6f77718987ade3"  # Replace with your actual key in production
     series_id = "CPIAUCSL"
     macro_data = fetch_macro_data_from_fred(api_key, series_id)
     st.write(macro_data.tail())
