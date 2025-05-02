@@ -1,7 +1,7 @@
 streamlit
 numpy
 pandas
+yfinance
 matplotlib
+requests
 beautifulsoup4
-yfinance>=0.2.57
-curl_cffi>=0.5.9
