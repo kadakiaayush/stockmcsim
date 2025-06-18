@@ -110,7 +110,7 @@ def plot_histograms(simulated_prices):
 def main():
     st.title('Stock Price Simulation and Analysis')
     
-        sp500_tickers = get_sp500_tickers()
+    sp500_tickers = get_sp500_tickers()
     st.sidebar.header('Simulation Parameters')
     
     default_tickers = ['AAPL', 'MSFT']
