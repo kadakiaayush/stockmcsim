@@ -120,7 +120,7 @@ def main():
         margin-top: 10px;
         font-size: 16px;
         border-radius: 6px;">
-        💡 <strong>Tip:</strong> Click the <b>menu arrow in the top-left corner</b> to open settings and customize things like tickers, time horizon, and thresholds.
+        💡 <strong>Tip:</strong> Click the <b>menu arrow in the top-left corner</b> to open settings and customize simulation parameters like stock tickers, time horizon, and return thresholds.
     </div>
     """,
     unsafe_allow_html=True
