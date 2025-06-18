@@ -110,9 +110,20 @@ def plot_histograms(simulated_prices):
 def main():
     st.title('Stock Price Simulation and Analysis')
     
-    sp500_tickers = get_sp500_tickers()
+        sp500_tickers = get_sp500_tickers()
     st.sidebar.header('Simulation Parameters')
-    selected_tickers = st.sidebar.multiselect('Select Stock Tickers', sp500_tickers, default=['AAPL', 'MSFT'])
+    
+    default_tickers = ['AAPL', 'MSFT']
+    selected_tickers = st.sidebar.multiselect(
+        'Select Stock Tickers',
+        sp500_tickers,
+        default=[ticker for ticker in default_tickers if ticker in sp500_tickers][:2]
+    )
+
+    if len(selected_tickers) < 2:
+        st.warning("Please select at least two tickers to enable simulation with a covariance matrix.")
+        st.stop()
+
     num_simulations = st.sidebar.slider('Number of Simulations', 1000, 10000, 1000, 1000)
     num_days = st.sidebar.slider('Number of Days', 10, 50, 30, 5)
     increase_percentage = st.sidebar.slider('Boom Return Threshold', 0.0, 0.5, 0.2, 0.05)
