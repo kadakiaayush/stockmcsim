@@ -109,7 +109,23 @@ def plot_histograms(simulated_prices):
 # Define the Streamlit app
 def main():
     st.title('Stock Price Simulation and Analysis')
-    
+
+    st.markdown(
+    """
+    <div style="
+        background-color:#ffeeba;
+        color:#856404;
+        border-left:5px solid #f0ad4e;
+        padding:16px;
+        margin-top:10px;
+        font-size:16px;
+        border-radius:4px;">
+        <strong>Tip:</strong> Use the <b>menu arrow on the top-left corner</b> to open the sidebar and customize simulation parameters like tickers, days, and thresholds.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
     sp500_tickers = get_sp500_tickers()
     st.sidebar.header('Simulation Parameters')
     
