@@ -113,7 +113,7 @@ def main():
     sp500_tickers = get_sp500_tickers()
     st.sidebar.header('Simulation Parameters')
     
-    default_tickers = ['AAPL', 'MSFT']
+    default_tickers = ['AAPL', 'NVDA']
     selected_tickers = st.sidebar.multiselect(
         'Select Stock Tickers',
         sp500_tickers,
