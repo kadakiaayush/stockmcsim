@@ -43,17 +43,49 @@ def get_sp500_tickers():
 
 # Function to fetch historical stock data from Yahoo Finance
 @st.cache_data(ttl=60 * 60 * 6)  # cache for 6 hours
+@st.cache_data(ttl=60 * 60 * 6)  # cache for 6 hours
 def fetch_stock_data(tickers, period="10y"):
     try:
         if not tickers:
             st.error("No tickers provided.")
             return pd.DataFrame()
         st.info("Fetching stock data from Yahoo Finance...")
-        # yfinance can accept a list or space/comma separated string
+
         data = yf.download(tickers, period=period, progress=False, threads=True)
         if data.empty:
             st.error("No data fetched for the given tickers. Please check the tickers or try again later.")
             return pd.DataFrame()
+
+        # Handle single ticker (Series or DataFrame with no MultiIndex)
+        if isinstance(data, pd.Series):
+            return data.to_frame(name=tickers[0])
+
+        if isinstance(data.columns, pd.MultiIndex):
+            # yfinance multi-ticker DataFrame
+            if "Adj Close" in data.columns.get_level_values(0):
+                adj = data["Adj Close"]
+            elif "Close" in data.columns.get_level_values(0):
+                adj = data["Close"]
+            else:
+                adj = data.xs(data.columns.levels[0][0], axis=1, level=0)
+        else:
+            # Single ticker DataFrame with simple columns
+            if "Adj Close" in data.columns:
+                adj = data[["Adj Close"]]
+                adj.columns = [tickers[0]]
+            elif "Close" in data.columns:
+                adj = data[["Close"]]
+                adj.columns = [tickers[0]]
+            else:
+                adj = data
+
+        # Make sure column names are clean ticker symbols
+        adj.columns = [str(c) for c in adj.columns]
+        return adj
+    except Exception as e:
+        st.error(f"An error occurred while fetching stock data: {e}")
+        return pd.DataFrame()
+
 
         # Prefer 'Adj Close' if available (multi-ticker yields a DataFrame with columns like ('Adj Close', 'AAPL'))
         if isinstance(data, pd.DataFrame) and ('Adj Close' in data.columns or ('Adj Close' in data.columns.levels if hasattr(data.columns, 'levels') else False)):
